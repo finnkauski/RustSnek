@@ -1,6 +1,6 @@
 // TODO: THe spam directions bug.
 // TODO: Scoreboard, items enemies, Pause
-//
+// TODO: Automatically workout the scale dimensions
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
