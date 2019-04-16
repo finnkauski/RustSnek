@@ -10,6 +10,7 @@ use piston::input::*;
 use piston::window::WindowSettings;
 
 use std::collections::LinkedList;
+use std::iter::FromIterator;
 
 #[derive(Clone, PartialEq)]
 enum Direction {
@@ -45,52 +46,52 @@ impl Game {
         let last_direction = self.snake.dir.clone();
 
         self.snake.dir = match btn {
-            &Button::Keyboard(Key::Up)
-                if last_direction != Direction::Down => Direction::Up,
-            &Button::Keyboard(Key::Down)
-                if last_direction != Direction::Up => Direction::Down,
-            &Button::Keyboard(Key::Left)
-                if last_direction != Direction::Right => Direction::Left,
-            &Button::Keyboard(Key::Right)
-                if last_direction != Direction::Left => Direction::Right,
-            _ => last_direction
+            &Button::Keyboard(Key::Up) if last_direction != Direction::Down => Direction::Up,
+            &Button::Keyboard(Key::Down) if last_direction != Direction::Up => Direction::Down,
+            &Button::Keyboard(Key::Left) if last_direction != Direction::Right => Direction::Left,
+            &Button::Keyboard(Key::Right) if last_direction != Direction::Left => Direction::Right,
+            _ => last_direction,
         }
-
     }
 }
 
 struct Snake {
-    pos_x: f64,
-    pos_y: f64,
+    body: LinkedList<(f64, f64)>,
     dir: Direction,
     scale: f64,
 }
 
 impl Snake {
     fn render(&mut self, gl: &mut GlGraphics, scale: &f64, args: &RenderArgs) {
-
         let white: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
 
-        let square = graphics::rectangle::square(
-            (self.pos_x * self.scale) as f64,
-            (self.pos_y * self.scale) as f64,
-            (self.scale as f64),
-        );
+        let squares: Vec<graphics::types::Rectangle> = self
+            .body
+            .iter()
+            .map(|&(x, y)| graphics::rectangle::square(x * self.scale, y * self.scale, self.scale))
+            .collect();
 
         gl.draw(args.viewport(), |c, gl| {
             let transform = c.transform;
-
-            graphics::rectangle(white, square, transform, gl);
+            squares.into_iter().for_each(|square| {
+                graphics::rectangle(white, square, transform, gl);
+            })
         })
     }
 
     fn update(&mut self) {
+        let mut new_head = (*self.body.front().expect("Snake has no body")).clone();
+
         match self.dir {
-            Direction::Left => self.pos_x -= 1.0,
-            Direction::Right => self.pos_x += 1.0,
-            Direction::Up => self.pos_y -= 1.0,
-            Direction::Down => self.pos_y += 1.0,
+            Direction::Left => new_head.0 -= 1.0,
+            Direction::Right => new_head.0 += 1.0,
+            Direction::Up => new_head.1 -= 1.0,
+            Direction::Down => new_head.1 += 1.0,
         }
+
+        self.body.push_front(new_head);
+
+        self.body.pop_back().unwrap();
     }
 }
 
@@ -106,8 +107,7 @@ fn main() {
     let mut game = Game {
         gl: GlGraphics::new(opengl),
         snake: Snake {
-            pos_x: 0.0,
-            pos_y: 0.0,
+            body: LinkedList::from_iter((vec![(0.0, 0.0), (0.0, 1.0)]).into_iter()),
             dir: Direction::Right,
             scale: SCALE,
         },
