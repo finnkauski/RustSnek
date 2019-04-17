@@ -32,27 +32,28 @@ enum Direction {
 struct Game {
     gl: GlGraphics,
     snake: Snake,
-    scale: f64,
     state: State,
+    grid_dims: (f64, f64),
 }
 
 impl Game {
     fn render(&mut self, arg: &RenderArgs) {
         use graphics;
 
-        let BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+        let black: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
         self.gl.draw(arg.viewport(), |_c, gl| {
-            graphics::clear(BLACK, gl);
+            graphics::clear(black, gl);
         });
 
-        self.snake.render(&mut self.gl, &self.scale, arg)
+        self.snake.render(&mut self.gl, arg)
     }
 
+    // TODO: Just pass reference to self in the update.
     fn update(&mut self) {
         if self.state == State::Running {
-            self.snake.update(&self.state);
+            self.snake.update(&self.state, self.grid_dims.0, self.grid_dims.1);
         } else {
-            ()
+            println!("PAUSED!", );
         }
     }
 
@@ -82,7 +83,7 @@ struct Snake {
 }
 
 impl Snake {
-    fn render(&mut self, gl: &mut GlGraphics, scale: &f64, args: &RenderArgs) {
+    fn render(&mut self, gl: &mut GlGraphics, args: &RenderArgs) {
         let white: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
 
         let squares: Vec<graphics::types::Rectangle> = self
@@ -95,23 +96,23 @@ impl Snake {
             let transform = c.transform;
             squares.into_iter().for_each(|square| {
                 graphics::rectangle(white, square, transform, gl);
-            })
-        })
+            });
+        });
     }
 
-    fn update(&mut self, state: &State) {
+    fn update(&mut self, state: &State, grid_x: f64, grid_y: f64) {
         let mut new_head = (*self.body.front().expect("Snake has no body")).clone();
 
         // check if it has reached the end.
-        fn check_border(head: &(f64, f64)) -> bool {
-            if head.0 >= 10.0 || head.1 >= 10.0 || head.0 < 0.0 || head.1 < 0.0 {
-                return true;
+        let hit: bool =
+            if new_head.0 >= grid_x || new_head.1 >= grid_y || new_head.0 < 0.0 || new_head.1 < 0.0
+            {
+                true
             } else {
-                return false;
-            }
-        }
+                false
+            };
 
-        match check_border(&new_head) {
+        match hit {
             true => {
                 self.body = LinkedList::from_iter((vec![(1.0, 0.0), (0.0, 0.0)]).into_iter());
                 self.dir = Direction::Right;
@@ -134,14 +135,17 @@ impl Snake {
 }
 
 fn main() {
-    const SCALE: f64 = 100.0;
-    const DIM: f64 = 100.0 * 10.0;
+    const WINDOW_WIDTH: f64 = 500.0;
+    const WINDOW_HEIGHT: f64 = 500.0;
+    const SNAKE_DIM: f64 = 10.0;
+    const GRID_X: f64 = WINDOW_WIDTH / SNAKE_DIM;
+    const GRID_Y: f64 = WINDOW_HEIGHT / SNAKE_DIM;
     const INITIAL_DIR: Direction = Direction::Right;
     let INITIAL: LinkedList<(f64, f64)> =
         LinkedList::from_iter((vec![(1.0, 0.0), (0.0, 0.0)]).into_iter());
 
     let opengl = OpenGL::V3_2;
-    let mut window: Window = WindowSettings::new("Snake", [DIM, DIM])
+    let mut window: Window = WindowSettings::new("Snake", [WINDOW_WIDTH, WINDOW_HEIGHT])
         .opengl(opengl)
         .exit_on_esc(true)
         .build()
@@ -152,14 +156,14 @@ fn main() {
         snake: Snake {
             body: INITIAL.clone(),
             dir: INITIAL_DIR.clone(),
-            scale: SCALE,
+            scale: SNAKE_DIM,
             starting_loc: INITIAL.clone(),
         },
-        scale: SCALE,
         state: State::Running,
+        grid_dims:(GRID_X, GRID_Y),
     };
 
-    let mut events = Events::new(EventSettings::new()).ups(8);
+    let mut events = Events::new(EventSettings::new()).ups(10);
     while let Some(e) = events.next(&mut window) {
         if let Some(r) = e.render_args() {
             game.render(&r);
@@ -169,7 +173,7 @@ fn main() {
             game.update()
         }
 
-        if let Some(mc) = e.mouse_cursor_args(){
+        if let Some(mc) = e.mouse_cursor_args() {
             println!("{:?}", mc);
         }
 
