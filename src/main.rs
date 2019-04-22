@@ -19,6 +19,12 @@ use std::iter::FromIterator;
 
 use rand::Rng;
 
+enum Outcome {
+    Side,
+    Food,
+    None,
+}
+
 #[derive(Clone, PartialEq)]
 enum State {
     Running,
@@ -115,22 +121,49 @@ impl Game {
     fn update(&mut self) {
         if self.state == State::Running {
 
-            // score collection
-            if let Some(h) = self.snake.body.front() {
-                if self.dot.position == (Coord{x: h.0, y: h.1}) {
+            match self.check_outcome() {
+                Outcome::Side => {
+                    self.snake
+                        .update(&self.state, Outcome::Side);
+                    self.score = 0;
+                },
+                Outcome::Food => {
                     self.dot.lifetime = 0;
                     self.score += 1;
-                    println!("{}", self.score );
+                    println!("{}", self.score);
+
+                },
+                Outcome::None => {
+                    self.snake
+                        .update(&self.state, Outcome::None);
                 }
             }
-
-            self.snake
-                .update(&self.state, self.grid_dims.0, self.grid_dims.1);
         } else {
-            println!("PAUSED!",);
+            
         }
     }
 
+    fn check_outcome(&self) -> Outcome {
+        let new_head = self.snake.body.front().expect("snake has no body");
+        // check if it has reached the end.
+        let hit: Outcome = if new_head.0 >= self.grid_dims.0
+            || new_head.1 >= self.grid_dims.1
+            || new_head.0 < 0.0
+            || new_head.1 < 0.0
+        {
+            Outcome::Side
+        } else if self.dot.position
+            == (Coord {
+                x: new_head.0,
+                y: new_head.1,
+            })
+        {
+            Outcome::Food
+        } else {
+            Outcome::None
+        };
+        hit
+    }
     fn pressed(&mut self, btn: &Button) {
         let last_direction = self.snake.dir.clone();
         if self.state == State::Running {
@@ -169,24 +202,15 @@ impl Snake {
         });
     }
 
-    fn update(&mut self, state: &State, grid_x: f64, grid_y: f64) {
+    fn update(&mut self, state: &State, outcome: Outcome) {
         let mut new_head = (*self.body.front().expect("Snake has no body")).clone();
-        // check if it has reached the end.
-        let hit: bool =
-            if new_head.0 >= grid_x || new_head.1 >= grid_y || new_head.0 < 0.0 || new_head.1 < 0.0
-            {
-                true
-            } else {
-                false
-            };
 
-        match hit {
-            true => {
+        match outcome {
+            Outcome::Side => {
                 self.body = LinkedList::from_iter((vec![(0.0, 0.0)]).into_iter());
                 self.dir = Direction::Right;
-
             }
-            false if state == &State::Running => {
+            Outcome::None if state == &State::Running => {
                 match self.dir {
                     Direction::Left => new_head.0 -= 1.0,
                     Direction::Right => new_head.0 += 1.0,
