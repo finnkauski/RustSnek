@@ -2,6 +2,7 @@
 // TODO: Scoreboard, items enemies, Pause
 // TODO: Automatically workout the scale dimensions
 // TODO: Use resize event to make it scalable.
+// TODO: Food spawns outside of box
 // NOTE: Multiscreen resolution broken.
 extern crate glutin_window;
 extern crate graphics;
@@ -112,34 +113,35 @@ impl Game {
         let black: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
         self.gl.draw(arg.viewport(), |_c, gl| {
             graphics::clear(black, gl);
+        //     graphics::text::Text::new_color([0.0, 1.0, 0.0, 1.0], 32).draw(
+        //         "Hello world!",
+        //         &_c.draw_state,
+        //         _c.transform, gl
+        //     ).unwrap();
         });
 
         self.snake.render(&mut self.gl, arg)
     }
 
-    // TODO: Just pass reference to self in the update.
     fn update(&mut self) {
         if self.state == State::Running {
-
             match self.check_outcome() {
                 Outcome::Side => {
-                    self.snake
-                        .update(&self.state, Outcome::Side);
+                    self.snake.update(&self.state, Outcome::Side);
                     self.score = 0;
-                },
+                    self.dot.lifetime = 0;
+                }
                 Outcome::Food => {
                     self.dot.lifetime = 0;
                     self.score += 1;
-                    println!("{}", self.score);
-
-                },
+                    self.snake.update(&self.state, Outcome::Food);
+                }
                 Outcome::None => {
-                    self.snake
-                        .update(&self.state, Outcome::None);
+                    self.snake.update(&self.state, Outcome::None);
                 }
             }
         } else {
-            
+
         }
     }
 
@@ -219,8 +221,16 @@ impl Snake {
                 }
 
                 self.body.push_front(new_head);
-
                 self.body.pop_back().unwrap();
+            }
+            Outcome::Food if state == &State::Running => {
+                match self.dir {
+                    Direction::Left => new_head.0 -= 1.0,
+                    Direction::Right => new_head.0 += 1.0,
+                    Direction::Up => new_head.1 -= 1.0,
+                    Direction::Down => new_head.1 += 1.0,
+                }
+                self.body.push_front(new_head);
             }
             _ => (),
         }
@@ -244,7 +254,8 @@ fn main() {
         .unwrap();
 
     // create initial reward
-    let mut dot = Edible {
+    // TODO: shove into Game
+    let dot = Edible {
         lifetime: 0,
         color: [1.0, 0.0, 0.0, 1.0],
         position: Coord { x: -1.0, y: -1.0 },
