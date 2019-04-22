@@ -33,6 +33,7 @@ enum Direction {
     Down,
 }
 
+#[derive(Clone, PartialEq)]
 struct Coord {
     x: f64,
     y: f64,
@@ -92,8 +93,10 @@ impl Edible {
 struct Game {
     gl: GlGraphics,
     snake: Snake,
+    dot: Edible,
     state: State,
     grid_dims: (f64, f64),
+    score: usize,
 }
 
 impl Game {
@@ -111,6 +114,16 @@ impl Game {
     // TODO: Just pass reference to self in the update.
     fn update(&mut self) {
         if self.state == State::Running {
+
+            // score collection
+            if let Some(h) = self.snake.body.front() {
+                if self.dot.position == (Coord{x: h.0, y: h.1}) {
+                    self.dot.lifetime = 0;
+                    self.score += 1;
+                    println!("{}", self.score );
+                }
+            }
+
             self.snake
                 .update(&self.state, self.grid_dims.0, self.grid_dims.1);
         } else {
@@ -158,7 +171,6 @@ impl Snake {
 
     fn update(&mut self, state: &State, grid_x: f64, grid_y: f64) {
         let mut new_head = (*self.body.front().expect("Snake has no body")).clone();
-        println!("{:?}", new_head);
         // check if it has reached the end.
         let hit: bool =
             if new_head.0 >= grid_x || new_head.1 >= grid_y || new_head.0 < 0.0 || new_head.1 < 0.0
@@ -172,6 +184,7 @@ impl Snake {
             true => {
                 self.body = LinkedList::from_iter((vec![(0.0, 0.0)]).into_iter());
                 self.dir = Direction::Right;
+
             }
             false if state == &State::Running => {
                 match self.dir {
@@ -206,17 +219,6 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut game = Game {
-        gl: GlGraphics::new(opengl),
-        snake: Snake {
-            body: LinkedList::from_iter((vec![(0.0, 0.0)]).into_iter()),
-            dir: INITIAL_DIR.clone(),
-            scale: SNAKE_DIM,
-        },
-        state: State::Running,
-        grid_dims: (GRID_X, GRID_Y),
-    };
-
     // create initial reward
     let mut dot = Edible {
         lifetime: 0,
@@ -228,17 +230,32 @@ fn main() {
             y: GRID_Y,
         },
     };
+
+    // create game instance
+    let mut game = Game {
+        gl: GlGraphics::new(opengl),
+        snake: Snake {
+            body: LinkedList::from_iter((vec![(0.0, 0.0)]).into_iter()),
+            dir: INITIAL_DIR.clone(),
+            scale: SNAKE_DIM,
+        },
+        dot: dot,
+        state: State::Running,
+        grid_dims: (GRID_X, GRID_Y),
+        score: 0,
+    };
+
     // eventloop
-    let mut events = Events::new(EventSettings::new()).ups(20);
+    let mut events = Events::new(EventSettings::new()).ups(10);
     while let Some(e) = events.next(&mut window) {
         if let Some(r) = e.render_args() {
             game.render(&r);
-            dot.render(&mut game.gl, &r);
+            game.dot.render(&mut game.gl, &r);
         }
 
         if let Some(_u) = e.update_args() {
             game.update();
-            dot.update(&game.state);
+            game.dot.update(&game.state);
         }
 
         if let Some(k) = e.button_args() {
