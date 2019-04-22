@@ -4,6 +4,7 @@
 // TODO: Use resize event to make it scalable.
 // TODO: Food spawns outside of box
 // NOTE: Multiscreen resolution broken.
+// TODO: window resizing
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -90,11 +91,6 @@ impl Edible {
         let ediY = rng.gen_range(0.0, &self.max_coords.y).round();
         self.position = Coord { x: ediX, y: ediY };
     }
-
-    fn reset(&mut self) {
-        self.position = Coord { x: -1.0, y: -1.0 };
-        self.lifetime = 0;
-    }
 }
 
 struct Game {
@@ -110,14 +106,11 @@ impl Game {
     fn render(&mut self, arg: &RenderArgs) {
         use graphics;
 
-        let black: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+        let col: f32 = (self.score as f32) / 25.0;
+        let black: [f32; 4] = [0.0, 0.0, col, 1.0];
+
         self.gl.draw(arg.viewport(), |_c, gl| {
             graphics::clear(black, gl);
-        //     graphics::text::Text::new_color([0.0, 1.0, 0.0, 1.0], 32).draw(
-        //         "Hello world!",
-        //         &_c.draw_state,
-        //         _c.transform, gl
-        //     ).unwrap();
         });
 
         self.snake.render(&mut self.gl, arg)
@@ -140,8 +133,6 @@ impl Game {
                     self.snake.update(&self.state, Outcome::None);
                 }
             }
-        } else {
-
         }
     }
 
@@ -207,29 +198,29 @@ impl Snake {
     fn update(&mut self, state: &State, outcome: Outcome) {
         let mut new_head = (*self.body.front().expect("Snake has no body")).clone();
 
+        fn increment(dir: &Direction, head: &mut (f64, f64)) {
+                match dir {
+                    Direction::Left => head.0 -= 1.0,
+                    Direction::Right => head.0 += 1.0,
+                    Direction::Up => head.1 -= 1.0,
+                    Direction::Down => head.1 += 1.0,
+                }
+        }
+
         match outcome {
             Outcome::Side => {
                 self.body = LinkedList::from_iter((vec![(0.0, 0.0)]).into_iter());
                 self.dir = Direction::Right;
             }
             Outcome::None if state == &State::Running => {
-                match self.dir {
-                    Direction::Left => new_head.0 -= 1.0,
-                    Direction::Right => new_head.0 += 1.0,
-                    Direction::Up => new_head.1 -= 1.0,
-                    Direction::Down => new_head.1 += 1.0,
-                }
-
+                increment(&self.dir, &mut new_head);
+                
                 self.body.push_front(new_head);
                 self.body.pop_back().unwrap();
             }
             Outcome::Food if state == &State::Running => {
-                match self.dir {
-                    Direction::Left => new_head.0 -= 1.0,
-                    Direction::Right => new_head.0 += 1.0,
-                    Direction::Up => new_head.1 -= 1.0,
-                    Direction::Down => new_head.1 += 1.0,
-                }
+                increment(&self.dir, &mut new_head);
+
                 self.body.push_front(new_head);
             }
             _ => (),
